@@ -1,0 +1,159 @@
+---
+title: "PS 3"
+output: 
+  pdf_document: default
+---
+```{r setup, include = F}
+knitr::opts_chunk$set(echo = F, warning = F, message = F, out.width = '75%', fig.align = 'center')
+
+
+# Load libraries
+library(tidyverse)
+library(scales)
+library(knitr)
+library(kableExtra)
+
+# Directory paths
+setwd("C:/Grad School/Year 1/Q2_Winter/R/Q2 2023/Problem Sets/ps3_directory")
+data_dir <- file.path(".", "analysis/files")
+
+```
+
+
+# About the data
+This data set contains housing data in California (pertaining to districts), as referenced by from the 1990 California census. 
+
+
+```{r, results= 'hide' }
+list.files(data_dir)
+housing_2019 <- readRDS(file.path(data_dir, "housing.RDS"))
+housing_2019 %>%
+  head(10) %>%
+  kable() %>%
+ kable_styling(latex_options = c('scale_down', 'HOLD_position'))
+```
+```{r, results = 'hide'}
+housing_2019$ocean_proximity <- factor(housing_2019$ocean_proximity, 
+                                             levels = c('ISLAND', 'NEAR BAY',
+                                                        'NEAR OCEAN', '<1H OCEAN',
+                                                        'INLAND'))
+```
+
+# Data analysis
+
+**This plot shows how the housing prices increase as proximity to water increases. Living by the bay or by the ocean are equally priced.**  
+```{r}
+ ggplot(housing_2019, 
+        aes(x=median_income, 
+            y= median_house_value, 
+            color = ocean_proximity)) + 
+  geom_point() + 
+  ggtitle("Income VS House Value ") +
+  xlab("Median Income") + 
+  ylab("Median House Value") + 
+  scale_color_brewer(
+    palette = 'Spectral', 
+    name = 'House Location') +
+  scale_x_continuous(
+    labels = label_number(prefix = "$", 
+                          suffix = "K", 
+                          scale = 10)) + 
+  scale_y_continuous(
+    labels = label_number(prefix = "$", 
+                          suffix = "K", 
+                          scale = .001)) +
+  theme_bw()
+```
+```{r}
+housing_2019$ocean_proximity <- factor(housing_2019$ocean_proximity, 
+                                             levels = c('ISLAND', 'NEAR BAY',
+                                                        'NEAR OCEAN', '<1H OCEAN',
+                                                        'INLAND'))
+```
+
+
+**We can see that our data of houses on islands is very small, and that the greatest heteroskedacity exists among houses within 1 hour from water. Again, the data for living near the ocean or the bay seem very similar.** 
+```{r}
+ggplot(housing_2019, 
+       aes(x=median_income, 
+           y= median_house_value)) + 
+  geom_point() + 
+  ggtitle("Income VS House Value ") +
+  xlab("Median Income") + 
+  ylab("Median House Value") + 
+  facet_grid(rows = vars(ocean_proximity)) +
+  scale_x_continuous(
+    labels = label_number(prefix = "$", 
+                          suffix = "K", 
+                          scale = 10)) + 
+  scale_y_continuous(
+    labels = label_number(prefix = "$", 
+                          suffix = "K", 
+                          scale = .001))+
+  theme_bw()
+```
+**This graph shows the spatial location of houses in CA, depicting inland houses comprising most of the housing in the market in the state. Perhaps the scarcity of bay side houses is the impetus of costly real estate by the bay.**
+```{r}
+ggplot(housing_2019, 
+       aes(x=longitude, 
+           y= latitude, 
+           color = ocean_proximity)) +
+  geom_point() + 
+  ggtitle("House Coordinates") +
+  xlab("Longitude") + 
+  ylab("Latitude") + 
+  scale_color_brewer(
+    palette = 'Spectral', 
+    name = 'House Location') +
+  coord_fixed() + 
+  theme_bw()
+```
+**This graph shows that the cheapest housing is inland, and the cheapest costal housing is in the north of the state. The most expensive housing are located are Los Angeles and San Francisco.** 
+```{r}
+ggplot(housing_2019, 
+       aes(x =longitude, 
+           y = latitude, 
+           color = median_house_value)) +
+  geom_point() + 
+  ggtitle("Coordinates & House Value ") +
+  xlab("Longitude") + 
+  ylab("Latitude") + 
+  scale_color_gradient(
+    low = '#132B43',
+    high = '#56B1F7',  
+    name = 'Median House Value', 
+    labels = label_number(prefix = "$")) + 
+  coord_fixed() + 
+  theme_classic()
+```
+**This histogram shows how expensive the real estate on islands are and how comprable average house value are for near bay, near ocean, <1 HR ocean houses are. As previous graphs showed, inland houses are cheaper.** 
+
+```{r}
+bar_plot <- housing_2019 %>% 
+  group_by(ocean_proximity) %>%  
+  summarize(value = 
+              mean(median_house_value))
+
+ggplot(bar_plot, 
+       aes(x=ocean_proximity, 
+           y = value, 
+           fill = ocean_proximity)) +
+  geom_bar(stat = 'identity') +
+  ggtitle("House Value by Ocean Proximity") + 
+  xlab("Ocean Proximity") + 
+  ylab("Average House Value") + 
+  scale_y_continuous(
+    labels = label_number(prefix = "$",
+                          suffix = "K", 
+                          scale = .001)) +
+  theme_bw()
+```
+
+**Bonus Plot: This chart shows a even split of the quantity of houses within 1 hour from the ocean and inland, and an even split between near ocean and near the bay. A small part of our data includes housing information on islands.** 
+```{r}
+
+pie(table(housing_2019$ocean_proximity), 
+    main = "Count of People Living Near Water")
+```
+
+# References

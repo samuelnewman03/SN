@@ -1,0 +1,93 @@
+---
+title: "Ocean Proximity"
+author: "Sam Newman"
+date: "2024-01-09"
+output: html_document
+---
+
+Background
+Housing data is downloaded from the National Center for Education Studies (NCES) website for 2019. Data is cleaned, filtered, and visulized into a scatterplot. 
+
+Outline 
+1. Download Data 
+2. Clean Data 
+3. Visualize Data 
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+setwd("C:/Grad School/Year 1/Q2_Winter/R/Q2 2023/Problem Sets/ps3_directory/ps3_directory.Rproj")
+```
+*Download Data* 
+
+```{r}
+input_data_dir <- file.path(".", "data")
+output_file_dir <- file.path(".", "analysis", "files")
+```
+
+```{r}
+download.file("https://nces.ed.gov/ipeds/datacenter/data/HD2019.zip",
+              file.path(input_data_dir, "hd"))
+download.file("https://nces.ed.gov/ipeds/datacenter/data/HD2019.zip",
+              file.path(input_data_dir, "hd"))
+download.file("https://nces.ed.gov/ipeds/datacenter/data/HD2019.zip",
+              file.path(input_data_dir, "hd"))
+```
+```{r}
+unzip(zipfile = file.path(input_data_dir, 'housing.zip' ), 
+      exdir = input_data_dir) #exdir tells R where to place the extracted files
+```
+
+```{r}
+housing_2019 <- read_csv(file = file.path(input_data_dir, "housing.csv"))
+```
+
+*Clean Data* 
+
+# investigate data 
+```{r}
+str(housing_2019$ocean_proximity)
+table(housing_2019$ocean_proximity)
+summary(housing_2019$ocean_proximity)
+```
+
+# filter data 
+```{r}
+clean_housing_2019 <- housing_2019 %>%  
+  filter(median_house_value <= 500000)
+```
+
+*Visualize Data* 
+
+# factor data 
+```{r}
+clean_housing_2019$ocean_proximity <- factor(clean_housing_2019$ocean_proximity, 
+                                             levels = c('ISLAND', 'NEAR BAY',
+                                                        'NEAR OCEAN', '<1H OCEAN',
+                                                        'INLAND'))
+```
+
+# create scatterplot 
+```{r}
+ggplot(clean_housing_2019, 
+       aes(x=median_income, 
+           y= median_house_value, 
+           color = ocean_proximity)) + 
+ scale_x_continuous(
+    labels = label_number(prefix = "$", 
+                          suffix = "K", 
+                          scale = 10)) + 
+  scale_y_continuous(
+    labels = label_number(prefix = "$", 
+                          suffix = "K", 
+                          scale = .001)) +
+  labs(
+    x = "Median Income", 
+    y = "Median House Value", 
+    title = "Income vs House Value (2019)", 
+    color = "Ocean Proximity") + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  geom_point()
+```

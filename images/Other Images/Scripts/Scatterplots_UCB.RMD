@@ -1,0 +1,60 @@
+---
+title: "Scatterplots"
+author: "Sam Newman"
+date: "2024-01-09"
+output: html_document
+---
+
+Background: 
+This script is part of an assignment that required student's to download data from a class account on github, clean the data, and create a scatterplot. The data was uploaded partially cleaned. 
+
+Outline: 
+1. Clean Data 
+2. Visualize Data
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+setwd("C:/Grad School/Portfolio")
+plots_dir <- file.path(".", "images")
+```
+
+```{r}
+load(url('https://github.com/anyone-can-cook/rclass2/raw/main/data/recruiting/recruit_school_somevars.RData'))
+```
+
+*Clean Data* 
+```{r}
+df_univ <- df_school %>%  
+  mutate(visited = 
+           ifelse(visits_by_110635 > 0, 1, 0)) %>%  
+  filter(state_code == "CA") %>%  
+  select(ncessch, 
+         total_students, 
+         avgmedian_inc_2564, 
+         visited)
+```
+
+*Visualize Data*
+```{r}
+
+ggplot(data = df_univ, 
+       aes(x = total_students, 
+           y = avgmedian_inc_2564, 
+           color = as.factor(visited))) +
+  geom_point() +
+  labs(
+    x = "Student Enrollment at High School", 
+    y = "Average Median Income of High School", 
+    title = "UC Berkely Recruitment Visits to Califorina High Schools"
+  ) + 
+   theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_color_discrete(
+    name = 'Recruitment Visits', 
+    labels = c('No visits', 'Visits'))
+png(file.path(plots_dir, 'scatterplot.png'))
+dev.off()
+```
+

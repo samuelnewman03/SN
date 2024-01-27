@@ -1,0 +1,152 @@
+---
+title: "Qualitative_CA Pop Race"
+author: "Sam Newman"
+date: "2023-06-27"
+output: html_document
+---
+
+Background: 
+This script was part of an assignment to update California's population count from the U.S. Census Bureau (https://data.census.gov/table/ACSDP5Y2022.DP05?g=860XX00US06902). The data is cleaned, manipulated, and presented in a pie chart. The data is subseted to include seven prominent races in California. 
+
+Outline: 
+
+1. Clean Data
+2. Descriptive Statistics
+3. Visualize Data 
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(ggrepel) #helps with placing labels outside of pie chart 
+library(ggtext)  #helps align caption for ggplots
+```
+
+```{r}
+setwd("C:/Grad School/The Campaign/Candidate Skills Assessment/data")
+```
+```{r}
+CA_pop_2020 <- read_xlsx("CA_pop_2020.xlsx", 
+                         sheet = "Data", 
+                         col_names = c(
+                           "race", 
+                           "population", 
+                           "margin of error",
+                           "percent", 
+                           "percent margin of error")
+                         ) 
+```
+
+*Clean Variable*  
+
+# subset and clean variable 
+```{r}
+subset_CA_pop_2020 <- CA_pop_2020 %>%  
+  select(race, population) %>% 
+  slice(c(77,83:89),) %>%  #races of interest
+  mutate(population = as.numeric( 
+           gsub(",", "", population))) # remove commas
+
+summary(subset_CA_pop_2020)
+nrow(subset_CA_pop_2020)
+length(subset_CA_pop_2020)
+```
+
+
+
+# add 'Native Hawaiian and Other Pacific Islander' to 'Asian' 
+```{r}
+#create df with just population for Asian and Native Hawaiian and Other Pacific Islander" 
+AANHPI <- subset_CA_pop_2020 %>% 
+  slice(5:6) 
+
+#add new row summing the population and creating a combined name for race 
+totaled_AANHPI<- AANHPI %>%  
+  add_row( 
+    race = "AANHPI", 
+    population = sum(AANHPI$population))
+
+#only keep total
+only_totaled_AANHPI <- totaled_AANHPI[3,]
+
+#add total back to subset_CA_pop_2020
+subset_CA_pop_2020 <- rbind(
+  subset_CA_pop_2020, 
+  only_totaled_AANHPI)
+
+#remove rows
+subset_CA_pop_2020 <- subset_CA_pop_2020 %>%  
+  filter(race != c(
+    "Asian alone", 
+    "Native Hawaiian and Other Pacific Islander alone")
+         )
+```
+
+# Change names of race values 
+```{r}
+clean_subset_CA_pop_2020 <- subset_CA_pop_2020 %>%  
+  mutate(race = recode(race,
+                       "White alone" = "White", 
+                       "Black or African American alone" = "Black", 
+                       "American Indian and Alaska Native alone" = "AIAN", 
+                       "Hispanic or Latino (of any race)" = "LatinX",
+                       "Two or more races" = "Multiracial", 
+                       "Some other race alone" = "Other"))
+```
+*Desriptive Statistics* 
+
+# create percent column 
+```{r}
+percent_subset_CA_pop_2020 <- clean_subset_CA_pop_2020 %>%  
+  mutate(percent = 
+           population/sum(population)) %>%
+  arrange(desc(population))
+```
+
+*Visualize Data* 
+
+# create vector to store colors for piechart 
+```{r}
+colors <- c("forestgreen",
+            "orange",
+            "cyan",
+            "gray", 
+            "blue",
+            "yellow",
+            "purple")
+```
+
+
+# reformat data to include positions column (for labels)
+```{r}
+pie_pop_2020 <- percent_subset_CA_pop_2020 %>% 
+  mutate(csum = rev(cumsum(rev(population))), 
+         pos = population/2 + lead(csum, 1),
+         pos = if_else(is.na(pos), population/2, pos))
+```
+
+# make piechart 
+```{r}
+ggplot(percent_subset_CA_pop_2020, 
+       aes(x = "", 
+           y = population, 
+           fill = fct_inorder(race))) +
+  geom_col(width = 1, 
+           color = "white") +
+  coord_polar(theta = "y") +
+   scale_fill_manual(values = colors) +
+  geom_label_repel(data = pie_pop_2020,
+                   aes(y = pos, 
+                       label = 
+                         paste0(race, "\n", " ", signif(percent*100, digits = 2), "%")),
+                   size = 2.5, 
+                   nudge_x = 1) +
+  theme_void() + 
+  theme(legend.position = 'none', 
+        plot.title = element_text(hjust = 0.5, 
+                                  size = 11, 
+                                  face = c("bold.italic")),
+        plot.caption = element_text(hjust = .5)) + 
+  ggtitle("California Population by Race") + 
+  labs(caption = 
+         ~bold("Source:")~"U.S. Census Bureau, American Community Survey, 2020 5-year Estimates, DP05.") 
+```

@@ -1,0 +1,159 @@
+---
+title: "Quantitative_HS Grad Rates"
+author: "Sam Newman"
+date: "2023-06-27"
+output: html_document
+---
+
+Background: 
+This script was part of an assignment to update California's high school graduation rates from the California Department of Education (https://www.cde.ca.gov/ds/ad/datasummary.asp). The data is cleaned, and visualized in a horizontal bar chart. 
+
+Outline: 
+
+1. Clean Data
+2. Visualize Data 
+
+```{r}
+library(tidyverse)
+library(readxl)
+```
+
+```{r}
+setwd("C:/Grad School/The Campaign/Candidate Skills Assessment/data")
+```
+
+```{r}
+full_hsgrad_2020_2021 <- read_xlsx("CA_HS_grad_2021-2022.xlsx")
+```
+*Clean Data* 
+
+# subset and clean data 
+```{r}
+subset_hsgrad <- full_hsgrad_2020_2021 %>%  
+  select("Race / Ethnicity", 
+         "Cohort Students", 
+         "Regular HS Diploma Graduates", 
+         "Cohort Graduation Rate") %>%  
+  
+  rename(
+    "Race" = "Race / Ethnicity", 
+    "TotalStudents" = "Cohort Students",
+    "GraduatingStudents" = "Regular HS Diploma Graduates",
+    "GraduationRate" = "Cohort Graduation Rate") %>%  
+  
+  mutate(
+    TotalStudents = 
+      as.numeric(TotalStudents), 
+    GraduatingStudents = 
+      as.numeric(GraduatingStudents), 
+    GraduationRate = 
+      as.numeric(GraduationRate))
+```
+
+
+# combine 'filipino', 'pacific islander', and 'asian' to AANHPI
+```{r}
+#subset Filipino, pacific islander, and asian 
+AANHPI <- subset_hsgrad %>% 
+  slice(3:4,6)
+
+totaled_AANHPI <- AANHPI %>%  
+  add_row(
+    Race = "AANHPI", 
+    TotalStudents = 
+      sum(AANHPI$TotalStudents), 
+    GraduatingStudents= 
+      sum(AANHPI$GraduatingStudents), 
+    GraduationRate = 
+      mean(AANHPI$GraduationRate))
+
+only_totaled_AANHPI <- totaled_AANHPI[4,]
+
+#add total back to clean_subset_hsgrad
+clean_subset_hsgrad <- rbind(
+  subset_hsgrad, 
+  only_totaled_AANHPI)
+
+#remove Filipino, Pacific Islander, Asian, and Statewide Total 
+clean_subset_hsgrad2 <- clean_subset_hsgrad[c(-3,-4,-6, -10),]
+```
+
+# rename race values and add commas
+```{r}
+clean_subset_hsgrad2 <- clean_subset_hsgrad2 %>%  
+  mutate(
+    Race = recode(Race, #rename values
+                  "African American" = "Black",
+                  "American Indian or Alaska Native" = "AIAN",
+                  "Hispanic or Latino" = "Latinx"), 
+   
+   TotalStudents = #add commas
+     prettyNum(TotalStudents,
+               big.mark = ",", 
+               scientific = FALSE))
+```
+
+
+*Visualize Data* 
+
+# order bars via factoring to match graph 
+```{r}
+factor_subset_hsgrad2 <- clean_subset_hsgrad2
+
+factor_subset_hsgrad2$Race <- factor(
+  factor_subset_hsgrad2$Race, 
+  levels = c(
+    "Not Reported", 
+    "White",
+    "Two or More Races",
+    "Latinx",
+    "Black", 
+    "AIAN", 
+    "AANHPI"))
+
+```
+
+# create barchart 
+```{r}
+ggplot(factor_subset_hsgrad2,
+       aes(x = Race, 
+           y = GraduationRate, 
+           fill = Race, 
+           label = paste0(TotalStudents,
+                          "    ", 
+                          scales::percent(round(GraduationRate,2))))) +
+  coord_flip() +
+  geom_col(position = 'dodge', 
+           width =.7) +
+  geom_text(position = 
+              position_dodge(width =.9),
+              hjust = .6, 
+              size = 3.5, 
+              fontface = "bold") + 
+  scale_fill_manual(values  = c("red",
+                                "orange", 
+                                "yellow", 
+                                "green",
+                                "lightblue",
+                                "grey",
+                                "purple")) +
+  scale_y_continuous(
+    labels = scales::percent, 
+    limits = c(0,1), #sets tick mark range
+    breaks = seq(0,1,.1)) +
+  
+  theme_classic() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    legend.position = "none") + 
+  
+  ggtitle("High School Graduation Rates by Race/Ethncity") + 
+  theme(
+    plot.title = element_text(
+      hjust =.5, 
+      size = 11, 
+      face = c("bold.italic")), 
+    plot.caption = element_text(hjust = 0)) +
+  labs(caption ="\n" ~bold("Source:")~"California Department of Education, 2020-2021 Four-year Adjusted Cohort Graduation Rate.")
+```
