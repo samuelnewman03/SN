@@ -1,0 +1,332 @@
+---
+title: "Funding_Debt_BeforeAfter"
+author: "Sam Newman"
+date: "2023-09-29"
+output: html_document
+---
+
+Background:
+The data comes from two quantitative questions asked in a survey that was given to
+a universities (named disclosed for confidentiality) 2nd year MPP students (n = 269) 
+from 2019-2023. Students checked a box stating their debt before and after the MPP 
+program from one of the following boxes: 0, Less than $10,000, $10,000-$20,000, 
+$30,000-$40,000, $40,000-$50,000, $50,000-$60,000, $60,000-$70,000, $70,000-$80,000, 
+$80,000-$90,000, $90,000-$100,000, More than $100,000). This script consolidates 
+the grouping of debt values, displays the changes in a grouped bar chart, and 
+produces descriptive statistics.   
+
+
+Outline: 
+1. Clean Data 
+2. Analyze Data 
+3. Manipulate Data
+4. Visualize Data
+5. Descriptive Statistics
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(stringr)
+library(gt)
+```
+
+# load clean exit survey data 2019-2023 (created in another script)
+```{r}
+sub_e2019_2023 <- readRDS("sub_e2019_2023.rds")
+```
+
+```{r}
+setwd("C:/Grad School/Student Affairs/Exit Survey")
+```
+
+*Clean Data*
+
+# create subset for data and investigate variables 
+```{r}
+debt <- sub_e2019_2023 %>% 
+  select(debt_priorMPP, 
+         debt_afterMPP, 
+         year)
+
+# 6 NA values 
+sum(is.na(debt))
+
+# 260 rows
+summary(debt_clean)
+
+# row # 's that contain NA's for debt_priorMPP: 24, 65, 162
+which(is.na(debt$debt_priorMPP))
+
+# row # 's that contain NA's for debt_afterMPP: 24, 65, 162
+which(is.na(debt$debt_afterMPP))
+
+# making sure that these values are both NA. They are all in year 2019
+debt[c(24,65,162),] %>%  view()
+
+# there are values for the rest of 2019
+debt %>%  
+  filter(year == 2019) %>%  
+  view()
+
+# remove the NA's from the data set 
+debt_clean <- debt %>%  
+  filter(!is.na(debt_priorMPP))
+
+# There are 3 row numbers where the respondent said "Decline to state" for 
+# both answers: 63, 194, 237. 
+# There are two rows for debt_prior that says "Decline to state": 224, 232
+# There is one row for debt_after that says "Decline to state": 36
+
+sum(debt_clean$debt_priorMPP == "Decline to state")
+which(debt_clean$debt_priorMPP == "Decline to state")
+
+sum(debt_clean$debt_afterMPP == "Decline to state")
+which(debt_clean$debt_afterMPP == "Decline to state")
+
+
+# confirming that "Decline to state" is the value for rows: 36, 63. 194, 223, 232, 237
+debt_clean[c(36, 63, 194, 
+             224, 232, 237),] %>%  
+  view()
+
+# use the code above to remove these values 
+debt_clean <- debt_clean %>%  
+  filter(debt_priorMPP != "Decline to state",
+         debt_afterMPP != "Decline to state")
+
+# need to (finish?)
+unique(debt_clean$debt_priorMPP)
+unique(debt_clean$debt_afterMPP)
+```
+
+*Analyze Data*
+
+# investigate debt_clean (count by year) 
+```{r}
+debt_clean %>%  
+  group_by(debt_priorMPP) %>% 
+  summarize(count = n()) %>%  
+  arrange(debt_priorMPP)
+
+
+debt_clean %>%  
+  group_by(debt_afterMPP) %>% 
+  summarize(count = n()) %>%  
+  arrange(debt_afterMPP)
+
+```
+
+*Manipulate Data*
+
+# create and clean debt_prior_count
+```{r}
+debt_prior_count <- debt_clean %>%  
+  group_by(debt_priorMPP) %>%  
+  summarize (count_prior = n())
+
+# debt_priorMPP is missing two values, so creating observations to add to debt_prior_count
+new_rows <- data.frame(
+  debt_priorMPP = c(
+    "$70,000 - $80,000", 
+    "$80,000 - $90,000"), 
+  count_prior = c(0, 0))
+
+# add rows to debt_prior_count
+debt_prior_count <- debt_prior_count %>%  
+  rbind(new_rows) %>%  
+  arrange(debt_priorMPP) 
+```
+
+# create and clean debt_after_count
+```{r}
+debt_after_count <- debt_clean %>%  
+                      group_by(debt_afterMPP) %>%  
+                      summarize (count_after = n())
+
+# debt_afterMPP is missing one value
+new_row <- data.frame(
+                      debt_afterMPP = "$60,000 - $70,000", 
+                      count_after = 0)
+
+# add rows to debt_after_count
+debt_after_count <- debt_after_count %>%  
+  rbind(new_row) %>%  
+  arrange(debt_afterMPP)
+
+# both objects have the same number of rows 
+nrow(debt_prior_count) 
+nrow(debt_after_count)
+```
+
+# merge debt_after_count$count_prior to debt_after_count 
+```{r}
+combined_debt_count <- debt_prior_count %>%  
+  mutate(count_after = debt_after_count$count_after)
+```
+
+# create object that groups values into 0, 1-9k, 10k-39k, 40k-79k, & 80k-120k
+```{r}
+grouped_barchart <- data.frame(
+  debt_amount = c("0" , 
+                  "1-9K",
+                  "10k-39k", 
+                  "40k-79k", 
+                  "80k-120k"), 
+  
+  count_priorMPP = as.double(c(
+                                  combined_debt_count$count_prior[10],
+                                  combined_debt_count$count_prior[11], 
+                               sum(combined_debt_count$count_prior[1:3]), 
+                               sum(combined_debt_count$count_prior[4:7]),                                                  sum(combined_debt_count$count_prior[c(8:9, 12)])
+                               )), 
+  
+  count_afterMPP = as.double(c( 
+                                  combined_debt_count$count_after[10],
+                                  combined_debt_count$count_after[11], 
+                               sum(combined_debt_count$count_after[1:3]), 
+                               sum(combined_debt_count$count_after[4:7]),                                                  sum(combined_debt_count$count_after[c(8:9, 12)])
+                               ))) 
+
+```
+
+# restructure data to work with grouped barchart (create fill variable "prior/after")
+```{r}
+# gather functions transforms wide data into long format by stacking columns. 
+format_grouped_barchart <- grouped_barchart %>%  
+  gather(
+          key = "before_after", 
+          value = "Value",
+          -debt_amount
+          )
+
+# recode variable names 
+ clean_format_grouped_barchart <- format_grouped_barchart %>%  
+   rename(debt_before_after = before_after, 
+          count = Value)
+ 
+# recode values for debt_prior_after to 'Before MPP' and "After MPP"
+ clean_format_grouped_barchart <- clean_format_grouped_barchart %>%  
+   mutate(debt_before_after = 
+            recode(debt_before_after,
+                   "count_priorMPP" = "Before MPP", 
+                   "count_afterMPP" = "After MPP"
+                   ))
+ 
+ 
+```
+
+# factor values for group_barchart 
+```{r}
+clean_format_grouped_barchart$debt_amount <-  
+  factor(clean_format_grouped_barchart$debt_amount,
+                             levels = c(
+                               "0" ,
+                               "1-9K",
+                               "10k-39k", 
+                               "40k-79k", 
+                               "80k-120k"
+                               ))
+
+clean_format_grouped_barchart$debt_before_after <- factor(clean_format_grouped_barchart$debt_before_after, 
+                              levels = c(
+                                 "Before MPP", 
+                                 "After MPP"
+                                 ))
+```
+
+*Visualize Data* 
+
+# create grouped barchart
+```{r}
+  ggplot(clean_format_grouped_barchart, 
+          aes(x= debt_amount, 
+              y = count, 
+              fill = debt_before_after)) + 
+  
+  geom_bar(
+        stat = "identity", 
+        position = "dodge",  
+        color = "black") +   
+ 
+  scale_y_continuous(
+        limits = c(0, 140),
+        breaks = seq(0, 140, by = 20),
+        labels = seq(0, 140, by = 20)) + 
+  
+  labs(
+    x = "Amount of Debt",
+    y = "Number of Students",
+    title = "Student Debt Before and After MPP \n (2019-2023)",
+    fill = "" ) +     
+  
+  scale_fill_manual(
+    values = c("Before MPP" = "lightblue", 
+               "After MPP" = "navyblue")) + 
+
+  theme(
+    axis.text = element_text(hjust = .5, size =10),
+    plot.caption = element_text(hjust = 1 ),
+    plot.title = element_text(hjust = .5, face = "bold", size = 12)) +
+  
+  labs(
+    caption = "The only responses included are from the 260 students 
+    who answered both questions.")
+
+```
+
+*Descriptive Statistics* 
+
+# find percentage of students with 0 debt before/after program 
+```{r}
+# create an object that finds the percent of students that had a certain amount of debt 
+percentage_count <- clean_combined_count %>% mutate(
+  percent_prior = round(count_prior/sum(count_prior),2), 
+  percent_after = round(count_after/sum(count_after),2))
+
+# checking the total number of students 
+sum(percentage_count$count_after)
+
+# create subset for $40K to 80K 
+forty_79 <- percentage_count %>%  filter(
+  debt_priorMPP %in% c(
+     "$40,000 - $50,000", 
+     "$50,000 - $60,000",
+     "$60,000 - $70,000", 
+     "$70,000 - $80,000"
+      ))                          
+
+sum(forty_79$percent_prior)
+sum(forty_79$percent_after)
+
+mean(percentage_count$percent_prior)
+summary(percentage_count$count_after)
+```
+
+# find rough estimate of average debt 
+```{r}
+average_count <- percentage_count %>%  mutate( 
+  estimate = as.numeric(c(
+    0, 
+    5000,
+    15000,
+    25000,
+    35000,
+    45000, 
+    55000, 
+    65000, 
+    75000, 
+    85000, 
+    95000, 
+    110000)))
+
+# create variable that multiplies count_after by the estimate. Then take mean to give rough estimate of total debt 
+total_average_count <- average_count %>%  
+  mutate(
+    total_estimate = count_after*estimate)
+
+# find mean (29019.23)
+sum(total_average_count$total_estimate)/sum(total_average_count$count_after)
+```
+

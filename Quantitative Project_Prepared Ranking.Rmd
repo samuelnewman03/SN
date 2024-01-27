@@ -1,0 +1,153 @@
+---
+title: "PP_prepared ranking"
+author: "Sam Newman"
+date: "2023-09-05"
+output: pdf_document
+---
+
+Background:
+The data comes from one quantitative question asked in a survey that was given to
+a universities (named disclosed for confidentiality) 2nd year MPP students (n = 269) 
+from 2019-2023. The question asked students to rank how prepared they feel for their
+career after the graduate program from "1= Not Prepared" to "5 = Very Prepared". 
+This script uses a for loop to calculate the weighted mean for each year's score (2019-2023). 
+Then each year's distance from the mean, in terms of standard deviation, is 
+calculated to determine the statistical significance of the result. 
+A chart is then created in Excel displaying the information.  
+
+Outline: 
+1. Descriptive Statistics
+    -Find weighted mean for all years 
+    -Use for loop to find weighted mean for each year 
+
+2. Manipulate Data 
+
+3. Descriptive Statistics
+    -Find each years distance from the weighted mean in terms of standard deviation 
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(stringr)
+library(gt)
+```
+
+```{r}
+setwd("C:/Grad School/Student Affairs/Exit Survey")
+```
+
+# load clean exit survey data 2019-2023 (created in another script)
+```{r}
+sub_e2019_2023 <- readRDS("sub_e2019_2023.rds")
+```
+
+# create subset for data and investigate  
+```{r}
+#create object called ranking. w/ variables of interest
+pp_ranking <- sub_e2019_2023 %>%  
+  select(pp_prepared_ranking, 
+         debt_afterMPP, 
+         year)
+
+#there are 0 NAs
+sum(is.na(pp_ranking$pp_prepared_ranking))
+
+#PP_ranking ranges from 1-5. 269 observations 
+summary(pp_ranking)
+```
+
+*Descriptive Statistics*
+
+# calculate the weighted mean for all years 
+```{r}
+#count values in ranking across ALL years. 269 observations   
+count_pp_ranking_all_years <- pp_ranking %>%  
+  group_by(pp_prepared_ranking) %>%  
+  summarize(count = n()) 
+ 
+w_mean_pp_ranking_all_years <- count_pp_ranking_all_years %>%  
+  mutate(weighted_rank = 
+           sum(pp_prepared_ranking * count)/sum(count)
+  )
+```
+
+# use for loop to calculate weighted mean years 2019:2023
+```{r}
+range <- c(2019:2023)
+
+count_pp_ranking <- list()
+w_mean_pp_ranking <- list()
+
+for (i in range) {
+  count_pp_ranking[[as.character(i)]] <- pp_ranking %>% 
+    filter(year == i) %>%  
+    group_by(pp_prepared_ranking) %>%  
+    summarize(count = n())
+  
+  w_mean_pp_ranking[[as.character(i)]] <- count_pp_ranking[[as.character(i)]] %>%  
+    mutate(weighted_rank = sum(pp_prepared_ranking * count) / sum(count))
+}
+```
+
+*Manipulate Data* 
+
+
+# unnest list 
+```{r}
+w_mean_pp_ranking_2019 <- w_mean_pp_ranking[[1]]
+w_mean_pp_ranking_2020 <- w_mean_pp_ranking[[2]]
+w_mean_pp_ranking_2021 <- w_mean_pp_ranking[[3]]
+w_mean_pp_ranking_2022 <- w_mean_pp_ranking[[4]]
+w_mean_pp_ranking_2023 <- w_mean_pp_ranking[[5]]
+```
+
+# create object containing average for years 2019:2023 and the average of 2019:2023
+```{r}
+  cumulative_w_mean_pp_ranking <- as.data.frame(
+    c(
+              w_mean_pp_ranking_all_years$weighted_rank[1], 
+              w_mean_pp_ranking_2019$weighted_rank[1], 
+              w_mean_pp_ranking_2020$weighted_rank[1], 
+              w_mean_pp_ranking_2021$weighted_rank[1], 
+              w_mean_pp_ranking_2022$weighted_rank[1], 
+              w_mean_pp_ranking_2023$weighted_rank[1])
+              )
+
+#change column name
+clean_cumulative_w_mean_pp_ranking <- cumulative_w_mean_pp_ranking %>%  
+  rename(
+   "weighted_mean" = "c(w_mean_pp_ranking_all_years$weighted_rank[1], w_mean_pp_ranking_2019$weighted_rank[1], w_mean_pp_ranking_2020$weighted_rank[1], w_mean_pp_ranking_2021$weighted_rank[1], w_mean_pp_ranking_2022$weighted_rank[1], w_mean_pp_ranking_2023$weighted_rank[1])") %>%  
+  mutate(
+    years = c(
+      "All Years", 
+      2019:2023), 
+    weighted_mean = 
+      round(weighted_mean, 2)) %>%  
+  select(
+    years, 
+    weighted_mean)
+ 
+```
+
+*Descriptive Statistics* 
+
+# determine level of statistical significance using standard deviations 
+```{r}
+#This uses the weighted means for each year 
+sd(clean_cumulative_w_mean_pp_ranking$weighted_mean)
+
+## of standard deviations away from the mean (add to object)
+standard_deviation <- data.frame( 
+  Years = c(
+      "All Years", 
+      2019:2023), 
+  "Standard Deviations from Average" = 
+    round(abs(clean_cumulative_w_mean_pp_ranking$weighted_mean[1]-      clean_cumulative_w_mean_pp_ranking$weighted_mean)/
+    sd(clean_cumulative_w_mean_pp_ranking$weighted_mean),
+  2))
+
+
+```
+

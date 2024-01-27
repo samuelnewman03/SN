@@ -1,0 +1,171 @@
+---
+title: "Effect of Smoking During Pregnancy"
+author: '"806083090"'
+date: "2023-01-22"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("readxl")
+library("tidyverse")
+library("haven")
+library("r2symbols")
+sym('beta', 'mew')
+```
+
+#read data
+```{r}
+law <- read_excel("lawsch85.xlsx", col_types = "numeric")
+bwght <- read_excel("bwght.xlsx")
+```
+#Structural investigation bwght df
+```{r}
+names(bwght)
+str(bwght)
+summary(bwght)
+
+```
+
+#Statistical investiagtion
+```{r}
+mean(bwght$cigs, na.rm = TRUE)
+sd <- sd(bwght$cigs)
+t.test(bwght$cigs)
+```
+
+#Hypothesis test w/ 95% confidence
+```{r}
+#1. H0: ucig = 0, HA: ucig != 0
+#2. Mean T-test 
+#3. Inf = .05 
+#4. t=13.019
+#5. Is t > Inf ? Yes, we can reject H0. 
+#6. With 95% certainty, the population average of mother’s do smoke 1 or more cigarettes during pregnancy. 
+```
+
+#Plot: linear regression of smoked cigarettes on birthweight. 
+```{r}
+ggplot(bwght, aes(x=cigs, y=bwght)) +
+    geom_point() +
+    geom_smooth(method = 'lm') + 
+    xlab('Cigarettes Smoked per Day by Mothers') + ylab('Birth Weight (ounces)')
+```
+
+#Calculation of OLS estimate
+```{r}
+#https://medium.com/analytics-vidhya/ordinary-least-square-ols-method-for-linear-regression-ef8ca10aadfc
+
+#Estimating Beta_1 (cigs)
+mean_x <- mean(bwght$cigs)
+mean_y <- mean(bwght$bwght)
+
+#storing values for Xi (n=10)
+x_1 <- bwght$cigs[1]
+x_2 <- bwght$cigs[2]
+x_3 <- bwght$cigs[3]
+x_4 <- bwght$cigs[4]
+x_5 <- bwght$cigs[5]
+x_6 <- bwght$cigs[6]
+x_7 <- bwght$cigs[7]
+x_8 <- bwght$cigs[8]
+x_9 <- bwght$cigs[9]
+x_10<- bwght$cigs[10]
+
+#difference of b/ween mean & Xi
+Diff_x1 <- mean_x - x_1
+Diff_x2 <- mean_x - x_2
+Diff_x3 <- mean_x - x_3
+Diff_x4 <- mean_x - x_4
+Diff_x5 <- mean_x - x_5
+Diff_x6 <- mean_x - x_6
+Diff_x7 <- mean_x - x_7
+Diff_x8 <- mean_x - x_8
+Diff_x9 <- mean_x - x_9
+Diff_x10 <- mean_x - x_10
+
+#storing values for Yi (n=10)
+y_1 <- bwght$bwght[1]
+y_2 <- bwght$bwght[2]
+y_3 <- bwght$bwght[3]
+y_4 <- bwght$bwght[4]
+y_5 <- bwght$bwght[5]
+y_6 <- bwght$bwght[6]
+y_7 <- bwght$bwght[7]
+y_8 <- bwght$bwght[8]
+y_9 <- bwght$bwght[9]
+y_10 <- bwght$bwght[10]
+
+#difference of b/ween mean & Yi
+Diff_y1 <- mean_y - y_1
+Diff_y2 <- mean_y - y_2
+Diff_y3 <- mean_y - y_3
+Diff_y4 <- mean_y - y_4
+Diff_y5 <- mean_y - y_5
+Diff_y6 <- mean_y - y_6
+Diff_y7 <- mean_y - y_7
+Diff_y8 <- mean_y - y_8
+Diff_y9 <- mean_y - y_9
+Diff_y10 <- mean_y - y_10
+
+#Product of differences for each value (i.e. x1 and y1)
+Product_xy1 <- Diff_x1*Diff_y1
+Product_xy2 <- Diff_x2*Diff_y2
+Product_xy3 <- Diff_x3*Diff_y3
+Product_xy4 <- Diff_x4*Diff_y4
+Product_xy5 <- Diff_x5*Diff_y5
+Product_xy6 <- Diff_x6*Diff_y6
+Product_xy7 <- Diff_x7*Diff_y7
+Product_xy8 <- Diff_x8*Diff_y8
+Product_xy9 <- Diff_x9*Diff_y9
+Product_xy10 <- Diff_x10*Diff_y10
+
+#sum of the differences calculated above
+sum_Product_XY<- Product_xy1 + Product_xy2 + Product_xy3 + Product_xy4 + Product_xy5 + Product_xy6 + Product_xy7 + Product_xy8 + Product_xy9 + Product_xy10
+
+#square the differences for Xi & mean
+square_Diff_x1 <- Diff_x1^2 
+square_Diff_x2 <- Diff_x2^2 
+square_Diff_x3 <- Diff_x3^2 
+square_Diff_x4 <- Diff_x4^2 
+square_Diff_x5 <- Diff_x5^2 
+square_Diff_x6 <- Diff_x6^2 
+square_Diff_x7 <- Diff_x7^2 
+square_Diff_x8 <- Diff_x8^2 
+square_Diff_x9 <- Diff_x9^2 
+square_Diff_x10 <- Diff_x10^2 
+
+#sum the squares of X differences (above)
+sum_square_Diff_x <- square_Diff_x1 + square_Diff_x2 + square_Diff_x3 + square_Diff_x4 + square_Diff_x5 + 
+  square_Diff_x6 + square_Diff_x7 + square_Diff_x8 + square_Diff_x9 + square_Diff_x10
+
+#calculate slope (B1)
+Slope_B1 <- sum_Product_XY/sum_square_Diff_x
+Slope_B1
+
+#calculate intercept (B0)
+intercept_B0 <- mean_y -(Slope_B1*mean_x)
+intercept_B0
+```
+#Statistical summary of birthweight and Cigarettes
+```{r}
+lm <- lm(bwght$bwght ~ bwght$cigs)
+summary(lm)
+
+```
+#Regression controlled for familty income
+```{r}
+lm2 <- lm(bwght$bwght ~ bwght$cigs + bwght$faminc)
+summary(lm2)
+
+```
+#Lograrithmic regressional analysis
+```{r}
+lm3 <- lm(log(law$salary, base = exp(1)) ~ law$LSAT + law$GPA + log(law$libvol, base= exp(1)) + log(law$cost, base= exp(1)) + law$rank)
+summary(lm3)
+
+```
+

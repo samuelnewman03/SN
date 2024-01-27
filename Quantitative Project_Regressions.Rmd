@@ -1,0 +1,245 @@
+---
+title: "Stats_PS3"
+author: "Sam Newman"
+date: "2023-03-16"
+output: pdf_document
+editor_options: 
+  markdown: 
+    wrap: 90
+---
+Background: This script contains my answers for a graduate level statistics II course at UCLA. 
+The course focused on various types of regression and methods to control for bias. 
+The following types of statistical methods are used in the script: pooled regression,
+fixed effects regression, removing outliers, multiple linear hypothesis testing, 
+regressions with panel structured data, and testing for good controls.  
+
+Outline: 
+
+```{r, include = FALSE}
+library(tidyverse)
+library(lfe)
+library(car)
+library(haven) 
+library(ivreg)
+```
+
+```{r, include = FALSE}
+setwd("C:/Grad School/Year 1/Q2_Winter/Stats/Data")
+```
+
+
+```{r, results = "hide"}
+current_pop_survey_78_95 <- read.csv("CPS78_85.csv")
+murder_rates_state_87_90_93 <- read.csv("murder.csv")
+law_salaries <- read.csv("lawsch85.csv")
+rent_law <- read_dta("RENTAL_PP208.dta")
+fertil2 <- read_dta("FERTIL2.DTA")
+```
+
+#investigate current_pop_survey_78_95 and murder_rates_state_87_90_93
+```{r}
+summary(current_pop_survey_78_95)
+length(current_pop_survey_78_95)
+nrow(current_pop_survey_78_95)
+
+summary(murder_rates_state_87_90_93)
+length(murder_rates_state_87_90_93)
+nrow(murder_rates_state_87_90_93)
+
+summary(law_salaries)
+length(law_salaries)
+nrow(law_salaries)
+
+summary(rent_law)
+length(rent_law)
+nrow(rent_law)
+```
+# determine the effect education has on wage and control for other variables for the current_pop_survey_78_95
+```{r}
+lm1 <- lm(lwage ~ educ + female + married + union + exper +y85, current_pop_survey_78_95)
+
+summary(lm1)
+```
+
+Interpretation: 
+
+After controlling for sex, martial status, union affiliation, work experience, 
+and year, each additional year of education increases wages, on average, by 
+8.7568%. In the year 1985, individuals were earning 39.43% more than in 1978.  
+
+# determine the effect of number of executions on murder rate and control for other variables(pooled regression)  
+```{r}
+lm2<- lm( mrdrte ~ exec + unem + d90 + d93, murder_rates_state_87_90_93)
+summary(lm2)
+```
+
+Interpretation: 
+
+After controlling for unemployment, an increase of 1 execution (over 3 years of 
+data) increased a state's murder rate in the state by .1628, on average. 
+ 
+After controlling for executions (within a state) and years 1987, 1990, and 
+1993, a one percentage increase in the unemployment rate in a given year, 
+increased in a state's murder rate by 1.3908 per 100,000 for the same year, on average. 
+
+Since 19987 is our baseline, given that d87 is omitted from lm2, the year 1990
+had 2.6733 (out of 100,000) more murders than 1987, and 1993 had 1.6073 (out
+of 100,000) more more murders than 1987. Both interpretations are after
+controlling for unemployment and executions in a state over a 3 years of data,
+and represent an average of murder rates for the given year.
+
+Explanation of Potential Bias:
+
+There are other variables that are correlated with either executions or
+unemployment (or potentially both) AND have a direct effect on murder rates.
+
+A state's population has a positive correlation with the amount
+of executions in a state. More people in jails increases the propensity for 
+executions and more populous cities tend to have higher crime and murder rates. 
+Therefore, the exclusion of population, in respect to executions, from the model 
+would cause the effect of executions on murder rates to be underestimated and 
+for there to be negative bias.
+
+# regress number of executions onto murdates and account for fixed effects  
+```{r}
+lm3 <- felm (mrdrte ~ exec + unem + d90 + d93 | id , murder_rates_state_87_90_93)
+summary(lm3)
+```
+
+Intrepretation: 
+
+Fixed effects model accounts for unobserved, fixed characteristics that are
+associated with individual states. For example, this 
+model accounts for Alabama's population for the years 1987, 
+1990, 1993. Alabama's population barley changed for these years (fixed) and 
+wasn't explicitly controlled for in lm3 (unobserved), yet is accounted for 
+in this model. 
+
+After controlling for unemployment and years 1987, 1990, 1993, an increase of 
+one execution (within a state) will decrease the murder rate by -.1383 
+(out of #100,000) on average. We have removed bias from our pooled regression 
+(lm2) because this model now accounts for unobserved, fixed characteristics for 
+individual states (like Alabama's population) which have a correlation with
+executions and a direct effect on murder rates. The change 
+of Beta 1_Exec reflects the collective sum of these fixed, unobserved 
+characteristics of individual states being added to our model.
+
+# find the state with the most executions and 2nd most executions 
+```{r}
+#produce table for 1993 by state and executions
+murder_rates_state_87_90_93 %>%  
+  select(state, 
+         exec, 
+         d93) %>%  
+  filter(d93 == 1) %>%  
+  table()
+
+#Confirm Texas had 34 executions in 1993
+murder_rates_state_87_90_93 %>%  
+  select(state, 
+         exec, 
+         d93) %>%  
+  filter(d93 == 1, 
+         exec >= 34)
+
+#Confirm Virginia had 11 executions in 1993
+murder_rates_state_87_90_93 %>%  
+  select(state, 
+         exec, 
+         d93) %>%  
+  filter(d93 == 1, 
+         exec >= 11)
+```
+
+Answer: 
+
+Texas had 25 more executions (34 total) than Virginia had (11) in 1993. 
+
+# remove Texas from the data since it is an outlier and recalcuate fixed effects regression
+```{r}
+murder_noTX <- murder_rates_state_87_90_93 %>%  
+  filter(state != "TX")
+
+lm4 <- felm (mrdrte ~ exec + unem + d90 + d93 | id , murder_noTX)
+summary(lm4)
+```
+
+Interpretation:
+
+Executions as a deterrent for murder becomes more effective, although still
+not statistically significant, as an increase in 1 execution (within a state) 
+decreases murderer rate by .1897 (out of 100,000), on average after controlling
+for unemployment. This is more than 0.1383 decrease in murder rate when Texas 
+was included the model. This is because there is an outlier in 1993 when Texas 
+had 34 executions, yet the murder rate for Texas that year was 11.9
+(which is more than .6 decrease from their yearly average of 12.57 deaths
+per 100,000). Thus, the dramatic increase in executions in 1993 did not lead 
+to a proportional increase in murder rate, which decreases the effective rate 
+of execution as a deterrent for murder. 
+
+
+# test multiple linear hypothesis testing 
+```{r}
+lm5 <- lm(lsalary ~ LSAT + GPA + llibvol + lcost + rank, law_salaries)
+summary(lm5)
+
+linearHypothesis(lm5,c("LSAT = 0", "GPA = 0"))
+```
+Interpretation: 
+
+We can be 99.9% confident that LSAT or GPA have an effect on future earnings 
+(lsalary) given that our p-value (9.518e-05) is less than our alpha (.001). 
+
+
+# determine the effect rent control has on rent and control for other variables 
+```{r}
+lm6 <- lm(lrent ~ rentcontrol + lpop + lavginc + pctstu + ltothsg + 
+            rentcontrol*y90, rent_law)
+summary(lm6)
+```
+
+Interpretation: 
+
+Controlling for (log) city population, (log) average income, (percent) student 
+housing, and (log) total housing units, when rent control was enacted 
+(year 1990), rent control decreased rent by 8.4058%, on average. 
+
+# determine the effect rent control has on rent while considering the panel structured date 
+```{r}
+lm7 <- felm(lrent ~ rentcontrol + lpop + lavginc + pctstu + ltothsg + y90 + rentcontrol*y90 | city, data = rent_law)
+
+summary(lm7)
+```
+
+Interpretation: 
+
+The coefficient for the interaction term of rent control and the year 1990, 
+increased to -.113533. That is, rent control is now decreasing rent, in 1990, 
+by 11.3533% on average, which is a bigger effect than when the city level 
+panel was ignored (8.4058%). Since we are now accounting for the city level 
+panel structure changes in individual cities from 1990 to 1980, aside from
+rent control, are now being netted out, so more of the change in rent 
+(dependent variable) is being explained by rent control.  
+
+# determine if non-rent control cities are good controls for rent-controlled variables 
+```{r}
+lm8  <- lm(lpop    ~ rentcontrol + y90 + rentcontrol*y90, rent_law)
+lm9  <- lm(lavginc ~ rentcontrol + y90 + rentcontrol*y90, rent_law)
+lm10 <- lm(pctstu  ~ rentcontrol + y90 + rentcontrol*y90, rent_law)
+lm11 <- lm(ltothsg ~ rentcontrol + y90 + rentcontrol*y90, rent_law)
+
+summary(lm8)
+summary(lm9)
+summary(lm10)
+summary(lm11)
+```
+
+Interpretation: 
+
+Non-rent control cities are good controls because the coefficient of the 
+interaction term of rent control and year 90 is close to 0 (not statistically significant). 
+For example in 1990, a cities' rent control law only decreased it's population 
+by .13584%, but that number has a large standard error and a p-value of .996. 
+Therefore, we would fail to reject H0 (Beta3_Rent Control*1990 = 0), and 
+conclude that rent control didn't effect the population of a city, and hence population of a city 
+is good control for cities that do and do not receive rent control, in years 1980 and 1990. 

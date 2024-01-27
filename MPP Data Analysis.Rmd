@@ -1,0 +1,462 @@
+---
+title: "MPP Analaysis_2"
+author: '"Sam Newman"'
+date: "2022-12-09"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+#Variables Needed
+Unpaid vs paid? How many? (Don’t forget NAs)
+How many are going private vs public? 
+Regional: Where are students getting their internships? (LA, CA, Part of the coast)
+Average Pay? (Convert units to hourly)
+What type of pay? Stipend? Salary?
+Average length of time? (Convert to weeks) 
+
+#Add the sectors for internships (education, politics, etc)
+
+```{r}
+#load data
+mpp <- read.csv("Portfolio_MPP Data.csv")
+
+#remove observation after quarter started
+mpp2 <- mpp[mpp$RECORD.ID != 58,]
+
+```
+
+```{r}
+#install packages
+library(tidyverse)
+library(labelled)
+library(dplyr)
+library(stringr)
+library(writexl) #save as excel file
+library(scales) #for percentages on ggplot
+
+```
+
+
+```{r}
+#investigate
+view(mpp2)
+glimpse(mpp2)
+class(mpp2)
+str(mpp2) 
+names(mpp2)
+
+```
+
+
+#Changed column names 
+
+```{r}
+mpp2 <- mpp2 %>% mutate(
+  intern_date = Internship.Start.and.End.Date..Month.Year.,
+  offered_money = Did.your.internship.organization.site..or.any.of.your.internship.organization.sites..offered.compensation.,
+  salary = If.offered.compensation..how.much.did.you.received., 
+  website = Organization.Website..include.for.all.internship.organization.sites.)
+
+mpp2 %>% dplyr::select(intern_date, offered_money, salary) %>% view()
+```
+
+
+#Internship: Format Dates To # of weeks
+```{r}
+mpp2$intern_length <- mpp2$intern_date
+mpp2$intern_date <- gsub(",", "", mpp2$intern_length)  #deletes commas
+
+#count the # of months for each internship
+mpp2 <- mpp2 %>%  mutate(intern_length =  
+    recode(intern_date, "June 2021 - July 2021" = "2",
+           "March 2021-July 2021" = "5",
+           "Julty 2021- August 2021" = "2", 
+           "June 2021 - September 2021"  = "4", 
+           "June 28 2021 - August 27 2021" = "2",
+           "May 2021 - December 2021 "   = "8", 
+           "June 2021-August 2021"  = "3", 
+          "Los Angeles LGBT Center- January 2021 to April 2021\n\nCASA LA- June 2021 to August 2021" = "7",
+           "June 28, 2021 - August 27, 2021" = "3" ,                                                       
+          "September 2020 - June 2021" = "10" ,                                                              
+            "June 2021 to September 2021"  = "3" ,                                                            
+            "June 2021 - October 2021" = "4" ,                                                                
+            "July 2021-August 2021"   = "2" ,                                                                 
+            "May 2021 - August 2021"   = "3" ,                                                                
+           "7/1/2021-8/27/2021"     = "2" ,                                                                  
+            "June 7 2021 - August 13 2021"   = "3" ,                                                        
+           "CHC: May 2021-September 2021\nCongressman Tony Cardenas: September 2021- December 2021"  = "9" , 
+          
+           "June 28 2020 to August 23 2021" = "15" ,                                                        
+            "January 2021-August 2021 "   = "6" ,                                                             
+           "March 2021 - Current "  = "5" ,                                                                  
+            "February 2021 - September 2021"   = "7" ,                                                        
+            "March 2021 - June 2022"   = "16" ,                                                                
+            "June 2021- September 2021"  = "4" ,                                                              
+            "January 2021 - January 2022"    = "12" ,                                                          
+            "July 2021-September 2021" = "2" ,                                                                
+            "July 2020 - ongoing"      = "26" ,                                                                
+             "May 2020 - Present"      = "28" ,                                                                 
+            "January 2021 - June 2021"   = "6" ,                                                              
+            "October 2020 - June 2022"     = "20" ,                                                            
+            "February 10 2020 - November 24 2020"    = "9" ,                                                
+           "BOS 7/2021-05/2022\nOCP 08/2021-05/2022"   = "19" ,                                               
+            "May 2021 - May 2022"     = "12" ,                                                                 
+            "June 2021-June 2022"     = "12" ,                                                                 
+           "June 20 2021 - August 20 2021"    = "3" ,                                                        
+           "July 2021 - June 2022\nregistered for the PP 496 during SPRING 2022"  = "11" ,                    
+            "January 2021-July 2021"  = "7" ,                                                                 
+           "October 2021-June 2022"   = "8" ,                                                                
+            "May 2021 - September 2021. "    = "5" ,                                                        
+            "September 2020 - November 2020"    = "3" ,                                                       
+            "August 2021-March 2022"           = "8" ,                                                        
+           "LA LGBT Center: June 2021-September 2021\nUCLA IRLE: January 2022-March 2022"      = "6" ,       
+            "June 2021 - June 2022"           = "12" ,                                                          
+           "September 2021 - May 2022"       = "8" ,                                                        
+            "June 2021-September 2021"        = "4" ,                                                        
+            "07/01/2021 - 06/30/2022"         = "11" ,                                                        
+            "April 15 - June 10 2022"        = "3" ,                                                         
+            "February 2021- September 2021"   = "8" ,                                                         
+            "June 2021-October 2021"          = "5" ,                                                         
+            "November 2021 - June 2022"       = "7" ,                                                         
+            "June 2020 - August 2020"         = "3" , 
+           ))
+
+#convert characters of intern_length to numeric 
+mpp2$intern_length <- as.numeric(mpp2$intern_length)
+
+mpp2 %>% dplyr::select(intern_date, intern_length) %>%  view()
+
+
+summary(mpp2$intern_length)
+```
+
+#Adding info on internship
+#private vs. public 
+```{r}
+###Create new column saying if internship is private (1) or public (0)
+mpp2 <- mpp2 %>%  mutate( private =  c(1,1,1,1,0, 
+                  1,1,1,0,    #4 inputs in this row. Rest are 5
+                  1,1,0,1,1,
+                  1,1,1,0,0,
+                  1,1,0,1,1,
+                  0,0,1,0,0,
+                  0,0,1,0,0,
+                  0,0,1,0,1,
+                  0,0,0,0,0,
+                  0,0,0,1,0,
+                  1,0,0,0,0,
+                  0,0,1))
+```
+
+#internship type
+```{r}
+#create variable for different types internships
+mpp2 <- mpp2 %>%  mutate(type = 
+c("Non-Profit","Philanthropic", "Business", "Non-Profit", "Non-Profit",
+  
+"Non-Profit", "Non-Profit", "Non-Profit", "Non-Profit",
+
+"Business","Non-Profit","Non-Profit", "Non-Profit", "Business",
+
+"Philanthropic", "Non-Profit", "Non-Profit","Non-Profit","Government",
+
+"Non-Profit","Non-Profit", "Government","Non-Profit", "Business(Tech)",
+
+"Government", "Utilities", "Non-Profit", "Government", "Government",
+
+"Research Institute","Research Institute", "Non-Profit","Non-Profit", "Research Institute",
+
+"Government","Government","Business", "Government", "Business",
+
+"Research Institute", "Research Institute", "Non-Profit","Government","Government",
+
+"Government","Research Institute","Government", "Non-Profit","Research Institute",
+
+"Business", "Government","Education","Non-Profit", "Research Institute",
+
+"Research Institute","Education", "Non-Profit"))
+```
+
+#Internship location
+```{r}
+#create variable for different for internship location
+mpp2 <- mpp2 %>%  mutate( location = 
+  c("Washington DC, DC", "Palo Alto, CA", "New York City, NY", "Washington DC, DC", "Los Angeles (West Lake South), CA",
+"Yonkers, NY", "Los Angeles (West Lake South), CA", "Los Angeles (Moneterey Park), CA", "Tokyo, Japan", 
+
+"Shanghai, China", "Los Angeles (Westwood), CA", "Los Angeles (Santa Monica), CA", "Los Angeles (Santa Monica), CA", "Shanghai, China",
+
+"Palo Alto, CA","Washington DC, DC","Washington DC, DC","Sacramento, CA", "Washington DC, DC",
+
+"Los Angeles (Arts District), CA","Los Angeles (Chinatown), CA","Los Angeles (Long Beach), CA", "Los Angeles (Westlake), CA", "Bejing, China",
+
+"Los Angeles (Hollywood), CA","Sacramento, CA", "Dublin, Ireland", "Los Angeles (Little Tokyo), CA", "Camarillo, CA",
+
+"Los Angeles (Westwood), CA", "Los Angeles (Westwood), CA","Sherman Oaks, CA","Los Angeles (City West), CA", "Los Angeles (Westwood), CA",
+
+"Los Angeles (Little Tokyo), CA", "Los Angeles (Wilshire Center), CA", "El Segundo, CA", "Los Angeles (Little Tokyo), CA", "Burbank, CA", 
+
+"Los Angeles (Westwood), CA", "Los Angeles (Westwood), CA", "Los Angeles (Park Mesa Heights), CA", "Glendale, CA","Sacramento, CA",
+
+"Redondo Beach, CA", "Los Angeles (Westwood), CA", "Los Angeles (Little Tokyo), CA", "San Francisco, CA", "Los Angeles (Westwood), CA",
+
+"El Segundo, CA", "Los Angeles (Little Tokyo), CA", "Walnut, CA", "Richmond, VA", "Los Angeles (Westwood), CA",
+
+"Los Angeles (Westwood), CA", "Sacramento, CA", "Los Angeles (West Lake South), CA"))
+```
+
+#Internship field  
+```{r}
+#create variable for internship field
+mpp2 <- mpp2 %>%  mutate(field = c(
+"Environment", "Education", "Business", "Law", "Law",
+"Business", "Queer Empowerment", "Business", "Business", "Education",
+ "Public Health", "Homelessness", "Finance", "Education", "Business",
+ "Business", "Business", "Law", "Government", "Environment",
+ "Grants", "Technology (Government)", "Latinax Studies", "Technology (Business)", "Government",
+ "Electricity Utilities", "Social Change (Education, Environment)", "Women Empowerment", "Government ",
+"Policy", "Policy", "Economic Development (Government)", "Community Development", "Environment",
+"Community Development", "Education", "Business Development", "Transportation", "Business",
+"Community Development", "Black Empowerment", "Homelessness", "Government", "Government", 
+"Public Health", "Queer Empowerment", "Government", "Public Health", "Public Health (law)", 
+ "Business", "Government", "Education", "Education", "Black Empowerment", 
+"Public Health", "Education", "Queer Empowerment"))
+
+```
+
+
+#Analysis: Type, Private, Location
+```{r}
+mpp2 %>%  dplyr::select(private, location, type) %>% arrange(private, location, type) %>%  view()
+
+mpp2 %>%  dplyr::select(private) %>% summary()
+
+table(mpp2$private)
+table(mpp2$location)
+table(mpp2$type)
+table(mpp2$state)
+table(mpp2$location)
+
+library(epiDisplay) #nicer frequency tables 
+tab1(mpp2$type, sort.group = "decreasing", main = "Internship Type (n=57)", bar.values = "frequency", xlab = "Respondents")
+tab1(mpp2$location, sort.group = "decreasing", cum.percent = TRUE)
+
+```
+
+
+#Location by state
+```{r}
+#substring location to keep only state abbreviations
+mpp2 <- mpp2 %>%  mutate(
+  state = str_sub(location, start = -2, end= -1)) 
+
+#remove international locations
+mpp2$state[mpp2$state == "an" | mpp2$state == "na" | mpp2$state == "nd"  ] <- NA 
+  
+view(mpp2$state) 
+```
+
+#location w/in LA
+```{r}
+#Substring to keep just LA locations
+mpp2 <- mpp2 %>%  mutate(
+  LA_neigh = str_sub(location, start = 14, end= -6))
+
+#assign NA to locations outside of LA
+mpp2$LA_neigh[mpp2$LA_neigh == "" ] <- NA 
+
+
+view(mpp2$LA_neigh) 
+```
+
+#Analysis: Location, State, La_neigh 
+```{r}
+mpp2 %>%  dplyr::select(location, state, LA_neigh) %>% arrange(location, state, LA_neigh) %>%  view()
+
+table(mpp2$location)
+table(mpp2$state)
+table(mpp2$LA_neigh)
+
+library(epiDisplay) #nicer frequency tables 
+tab1(mpp2$state, sort.group = "decreasing", cum.percent = TRUE)
+tab1(mpp2$LA_neigh, decimal = 0, sort.group = "decreasing", missing = FALSE, cum.percent = FALSE, bar.values = "frequency", main = "Internships within LA (n=29)", xlab = "Respondents")
+
+
+
+```
+
+
+#Salary: Add NAs to empty data & Force NA entries
+```{r}
+#assign NA to entries
+mpp2$salary[mpp2$salary == "" | mpp2$salary == "work study" | mpp2$salary == "N/A"  ] <- NA 
+
+view(mpp2$salary)
+
+#view only unique entries
+unique(mpp2$salary)
+```
+
+
+#Create Salary2. (1:Intern was paid. 2: Intern wasn't paid, 0: NA )
+```{r}
+mpp2 <- mpp2 %>%  mutate(
+  salary2 = case_when(offered_money == "No, none of my internship organization sites offered compensation" ~ 0, 
+                      offered_money == "Yes, they provided compensation (at least one internship organization site)" ~ 1,
+                       offered_money == "Not Applicable" ~ 0))
+
+table(mpp2$salary2)
+view(mpp2$salary2)
+```
+
+#Create salary_digits (numeric, clean version of salary) 
+```{r}
+
+#remove $
+mpp2 <- mpp2 %>%  mutate(
+  salary_digits  = str_replace_all(salary, "[$]", ""))
+
+#remove comma
+mpp2 <- mpp2 %>%  mutate(
+  salary_digits  = str_replace_all(salary_digits, "[,]", ""))
+
+#remove backslash
+mpp2 <- mpp2 %>%  mutate(
+  salary_digits  = str_replace_all(salary_digits, "[/]", ""))
+
+#remove parenthesis
+mpp2 <- mpp2 %>%  mutate(
+  salary_digits  = str_replace_all(salary_digits, "[(]", ""))
+
+#remove lower and uppercase letters
+mpp2 <- mpp2 %>%  mutate(
+  salary_digits  = str_replace_all(salary_digits, "[aA-zZ]", ""))
+
+#shorten values wanted 
+mpp2 <- mpp2 %>%  mutate(
+  salary_digits = str_sub(salary_digits, start = 1, end= 7)) 
+
+#change single value on Row 56, column salary_digits to "90"
+ mpp2[56, "salary_digits"] <- "90"
+
+#convert characters to numeric
+mpp2$salary_digits <- as.numeric(mpp2$salary_digits)
+
+mpp2 %>%  dplyr::select(salary, salary_digits) %>%  view()
+
+unique(mpp2$hourly)
+```
+
+#Create hourly (only contains those who were paid hourly) & stipend
+```{r}
+mpp2 <- mpp2 %>%  mutate(
+  hourly = ifelse(salary_digits>91, NA, salary_digits))
+```
+
+#Create stipend (only contains those who were paid stipend)
+```{r}
+mpp2 <- mpp2 %>%  mutate(
+  stipend = ifelse(salary_digits<91, NA, salary_digits))
+
+#assign 0 to NA
+mpp2$stipend[is.na(mpp2$stipend)] = 0
+
+mpp2 %>%  dplyr::select(salary, salary_digits, stipend, hourly )%>%  view()
+```
+
+#Create stipend per week 
+```{r}
+
+#create stipend_per_week variable
+mpp2 <- mpp2 %>%  mutate(
+  stipend_per_week = stipend/(intern_length*4))
+
+mpp2 <- mpp2 %>%  mutate(
+  stipend_per_week = ifelse(stipend_per_week == is.na(stipend_per_week), 0, stipend_per_week))
+
+#round to 2 decimals
+mpp2 <- mpp2 %>%  mutate(
+  stipend_per_week = str_sub(stipend_per_week, start = 1, end= 5)) 
+```
+
+#Create hourly_as_stipend (converts hourly to stipend)
+```{r}
+mpp2 <- mpp2 %>%  mutate(
+  hourly_as_stipend = hourly*(intern_length*4),)
+
+#assign 0 to NA
+mpp2$hourly_as_stipend[is.na(mpp2$hourly_as_stipend)] = 0
+```
+
+#Create combo_hourly_salary (combinding hourly_as_stipend + stipend)
+```{r}
+mpp2$stipend <- as.numeric(mpp2$stipend)
+
+mpp2$hourly_as_stipend <- as.numeric(mpp2$hourly_as_stipend)
+
+#combines stipend vector + hourly_as stipend into one column. 
+mpp2$combo_salary_all_weeks <- mpp2$stipend + mpp2$hourly_as_stipend
+
+#assign 0 to NA 
+mpp2$combo_salary_all_weeks[mpp2$combo_salary_all_weeks == 0.00] <- NA
+mpp2$hourly_as_stipend[mpp2$hourly_as_stipend == 0.00] <- NA
+mpp2$stipend_per_week[mpp2$stipend_per_week == 0.00] <- NA
+mpp2$stipend[mpp2$stipend == 0.00] <- NA
+```
+
+#Create combo_salary_weekly
+```{r}
+mpp2 <- mpp2 %>%  mutate(
+ combo_salary_weekly = combo_salary_all_weeks/intern_length)
+ 
+#round to 2 decimals
+mpp2 <- mpp2 %>%  mutate(
+  combo_salary_weekly = round( combo_salary_weekly, digits = 2))
+```
+
+#Analysis: Salary
+```{r}
+mpp2 %>%  dplyr::select(hourly, stipend, stipend_per_week, hourly_as_stipend, combo_salary_all_weeks, combo_salary_weekly )%>%  view()
+
+mpp2 %>%  dplyr::select(hourly, stipend, hourly_as_stipend, combo_salary_all_weeks, combo_salary_weekly, intern_length) %>%  summary()
+
+tab1(mpp2$combo_salary_weekly, sort.group = "decreasing", cum.percent = TRUE)
+
+plot(mpp2$combo_salary_weekly,mpp2$intern_length, main="Scatterplot Example",
+   xlab="Salary ", ylab="Length", pch=19)
+
+#Quantity of students who reported how much they made. 
+mpp2 %>%  dplyr::select(combo_salary_weekly) %>% filter(combo_salary_weekly != is.na(combo_salary_weekly)) %>%  count()
+
+#Quantity of students who reported how much they made for hourly.  
+mpp2 %>%  dplyr::select(hourly) %>% filter(hourly != is.na(hourly)) %>%  count()
+
+#Quantity of students who reported how much they made for stipend 
+mpp2 %>%  dplyr::select(stipend) %>% filter(stipend != is.na(stipend)) %>%  count()
+
+#Quantity of students who reported for money week (stipend + hourly)
+mpp2 %>%  dplyr::select(combo_salary_weekly) %>% filter(combo_salary_weekly != is.na(combo_salary_weekly)) %>%  count()
+```
+#create new dataframe w/ variables only used for analysis. Save object as Excel
+```{r}
+mpp3 <- mpp2 %>%  dplyr::select(How.did.you.find.your.internship., intern_length, private, type, field, location, state, LA_neigh, offered_money, hourly, stipend,  stipend_per_week, hourly_as_stipend, combo_salary_all_weeks, combo_salary_weekly)
+
+#save object as excel file
+write_xlsx(mpp3,"C:\\Users\\samue\\OneDrive\\Desktop\\Grad School\\Year 1\\Student Affairs\\mpp3.xlsx")
+
+#df w/ info about prior internships. For current MPP students
+mpp2 %>% dplyr::select(field, website, location, offered_money, combo_salary_all_weeks) %>% view()
+
+mpp4 <- mpp2 %>% dplyr::select(field, Name.of.Internship.Organization.Site.s.,  website, location, offered_money, combo_salary_weekly, intern_length) 
+write_xlsx(mpp4,"C:\\Users\\samue\\OneDrive\\Desktop\\Grad School\\Year 1\\Student Affairs\\Student MPP Internships (2021).xlsx")
+
+```

@@ -1,0 +1,417 @@
+---
+title: "fundingMpp_BestFinancialAid"
+author: "Sam Newman"
+date: "2023-09-30"
+output: html_document
+---
+
+Background:
+The data comes from one qualitative question asked in a survey that was given to
+a universities (named disclosed for confidentiality) 2nd year MPP students (n = 269) 
+from 2019-2023. The question asked to list all the funding they received at the 
+university, and was a free response question.  This script cleans the data using 
+the stringr package and creates a horizontal bar chart displaying the top 9 most 
+mentioned types of funding. 
+
+Outline: 
+1. Clean Data
+3. Visualize Data
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(stringr)
+library(gt)
+```
+
+```{r}
+setwd("C:/Grad School/Student Affairs/Exit Survey")
+```
+# load clean exit survey data 2019-2023 (created in another script)
+```{r}
+sub_e2019_2023 <- readRDS("sub_e2019_2023.rds")
+sub_e2019_2023 %>%  select(best_course) %>% view()
+```
+
+*Clean Variable*
+
+# create subset for data and intial investigation  
+```{r}
+funding_MPP <- sub_e2019_2023 %>%  select(funding_MPP, year)
+
+#269 observations, class is character 
+summary(funding_MPP)
+
+#All the values are separated by commas. Some values that are free response. 
+unique(funding_MPP$funding_MPP)
+
+#rows that funding_MPP NAs: 157 160 162 175
+which(is.na(funding_MPP$funding_MPP))
+
+#no NAs
+which(is.na(funding_MPP$year))
+
+#confirming values are NA. They are all in year 2019
+funding_MPP[c(157, 160, 162, 175),] %>%  view()
+
+#remove values that NA for "funding_MPP" and "year" 
+ rm_na <- funding_MPP %>%  
+   filter(is.na(funding_MPP))
+
+funding_clean <- funding_MPP %>%  
+  filter(!is.na(funding_MPP))
+
+#there are 0 NAs left. 
+sum(is.na(funding_clean$funding_MPP))
+
+#There are 265 observations. 
+length(funding_clean$funding_MPP)
+
+#view distribution of responses by year 
+funding_clean %>%  
+  group_by(year) %>%  
+  summarize (count = n())
+```
+Clean data to seperate by commas using stringr
+
+#  change "on and off campus" to "on campus and off campus"
+```{r}
+on_off_campus <- which(!is.na(str_match(
+  funding_clean$funding_MPP, 
+  "on and off campus"))
+  )
+
+funding_clean[on_off_campus, 1] %>%  view()
+
+#check code to make sure it works 
+str_replace_all(funding_clean$funding_MPP,
+                "on and off campus", 
+                "on campus employment and off campus") 
+
+funding_clean_2 <- funding_clean %>% 
+  mutate(funding_MPP = 
+           str_replace_all(funding_MPP, 
+                           "on and off campus", 
+                           "on campus employment and off campus"))
+
+#check values 
+funding_clean_2$funding_MPP[c(36,84)]
+```
+# replace "and" with commas
+```{r}
+#which values use an "and"  
+and_rows <- which(!is.na(str_match(funding_clean$funding_MPP, "and"))) 
+
+#view and_rows
+funding_clean[and_rows, 1] %>%  view()
+
+#check code 
+str_replace_all(funding_clean$funding_MPP,
+                "and", 
+                ",") 
+
+#remove 'and' from object and replace with comma 
+funding_clean <- funding_clean %>% 
+  mutate(funding_MPP = 
+           str_replace_all(funding_MPP,
+                           "and",
+                           ","))
+
+#check values 
+which(!is.na(str_match(funding_clean$funding_MPP, "and"))) 
+```
+
+# save object to use in FundingMPP_NumberOfSources 
+```{r}
+save(funding_clean, file = "fundingMPP_clean")
+```
+
+# analyize Theme_Improvements 
+
+# seperate values by commas
+```{r}
+funding_sep <- funding_clean %>%  
+  separate_rows(funding_MPP, 
+                sep = "[,.]")
+
+
+funding_sep %>%  
+  group_by(funding_MPP) %>% 
+  summarize (count = n()) 
+```
+
+# clean funding_sep
+```{r}
+#remove white space before and after comma separated values 
+funding_sep_clean <- funding_sep %>%  
+  mutate(funding_MPP =  
+           str_squish(funding_MPP))
+
+#convert all words to lower case 
+funding_sep_clean <- funding_sep_clean %>%  
+  mutate(funding_MPP =  
+           tolower(funding_MPP))
+
+#these rows have blank values (18 total)
+which(funding_sep_clean$funding_MPP == "") 
+length(which(funding_sep_clean$funding_MPP == ""))
+
+#make sure code works to delete blank values  
+funding_sep_clean %>%  
+  filter(funding_MPP != "") %>%  
+  nrow()
+
+length(funding_sep_clean$funding_MPP)
+
+#remove blank rows 
+funding_sep_clean <- 
+  funding_sep_clean %>%  
+  filter(funding_MPP != "")
+
+#check that values were removed
+which(funding_sep_clean$funding_MPP == "") 
+```
+
+# make count object of funding_sep_clean
+```{r}
+funding_sep_count <- funding_sep_clean %>%  
+  group_by(funding_MPP) %>%  
+  summarize (count = n()) %>%  
+  arrange(count) %>%  
+  view()
+```
+
+# recode misspelled words 
+```{r}
+funding_sep_count_clean <- funding_sep_count %>%
+  mutate(funding_MPP = recode(funding_MPP,
+              "family resources" = "external sponsor (family/partner support)",
+              "family resources." = "external sponsor (family/partner support)",
+              "family" = "external sponsor (family/partner support)",
+              "family resources for regular expenditures" = "external sponsor 
+              (family/partner support)",
+              "family supports." = "external sponsor (family/partner support)",
+              "fellowships" = "department fellowship/scholarship",
+              "fellowship" = "department fellowship/scholarship",
+              "fellowships/awards" = "department fellowship/scholarship",
+              "department fellowships both years" = "department 
+              fellowship/scholarship",
+              "graduate opportunity fellowship" = "department 
+              fellowship/scholarship",
+              "i received awards" = "department fellowship/scholarship",
+              "graduate opportunity fellowship program for the first year" 
+              = "department fellowship/scholarship",
+              "awards" = "department fellowship/scholarship", 
+              "scholarships" = "department fellowship/scholarship", 
+              "loans" = "student loans",
+              "loans." = "student loans",
+              "most funding was from loans." = "student loans",
+              "gsrs" = "gsr",
+              "gsr position" = "gsr", 
+              "gsr position both years" = "gsr",
+              "a luskin fellowship" = "luskin fellowship/scholarship 
+              (david bohnett fellowship/liberty hill fellowship/dukakis 
+              fellowship)",
+              "david bohnett fellowship" = "luskin fellowship/scholarship 
+              (david bohnett fellowship/liberty hill fellowship/dukakis fellowship)",
+              "fellowships from the luskin school" =  
+                "luskin fellowship/scholarship (david bohnett 
+              fellowship/liberty hill fellowship/dukakis fellowship)",
+              "off campus employment" = "off-campus employment", 
+              "interned for half of my first year"= "off-campus employment", 
+              "later as a paid intern at a government agency for part of the 
+              time that i was in the program" = "off-campus employment", 
+              "internship" = "off-campus employment",
+              "company" = "off-campus employment", 
+              "covered by my employer" = "off-campus employment", 
+              "on campus employment" = "on-campus employment",
+              "a paid internship." = "off-campus employment", 
+              "my time here was funded by the u.s. army" = "off-campus employment",
+              "a pickering fellowship" = "external fellowship",
+              "deans leaders in health" = "external fellowship",
+              "md (prime-la) funding" = "external fellowship",
+              "med school scholarship/loans are included" = "external fellowship",
+              "i also received scholarships through the medical school" 
+              = "external fellowship",
+              "funded by government" = "external fellowship",
+              "funding from the government" = "external fellowship",
+              "funding from the government" = "external fellowship",
+              "japan government" = "external fellowship",
+              "japanese government fund" =  "external fellowship",
+              "japanese government support" = "external fellowship",
+              "gi bill" = "external fellowship",
+              "government funding" = "external fellowship",
+              "i ta'd for one quarter" = "taships", 
+              "i was only given one taship" = "taships", 
+              "csun professor" = "external fellowship",
+              "alumni" = "department fellowship/scholarship",
+              "inheritance" = "private saving",
+              "my bank account" = "private saving",
+              "i also worked part-time for asucla" = "off-campus employment", 
+              "i typically had at least one job at all times" = "on-campus 
+              employment", 
+              "i was also employed as a reader at ucla" =  "on-campus
+              employment",
+              "i was only given one taship" = "taships", 
+              "off campus internships" =  "off-campus employment", 
+              "on campus" = "on campus employment", 
+              "parent's support" = "external sponsor (family/partner support)",
+              "parents" = "external sponsor (family/partner support)",
+              "personal resources" = "private saving", 
+              "personal savings" = "private saving", 
+              "ppia fellowship" = "external fellowship",
+              "private support" = "external sponsor (family/partner support)",
+              "received a financial stipend" = "external fellowship",
+              "received fellowships" = "department fellowship/scholarship",
+              "received two fellowships from the department" = 
+                "department      fellowship/scholarship",
+              "savings from work experience" = "private saving", 
+              "school of medicine prime program" = "external fellowship",
+              "science scholarship"  = "external fellowship",
+              "significant student loans!" = "student loans", 
+              "simultaneous full-time employment - office of us senator alex 
+              padilla" = "off-campus employment", 
+              "sponsored by government" = "external fellowship",
+              "sponsorship by my employer" = "off-campus employment", 
+              "sponsorship from my country for tuition" =  "external fellowship",
+              "sponsorship from the japanese government" = "external fellowship",
+              "student loans mostly (almost $100" = "student loans",
+              "taship" = "taships", 
+              "the rest was loans" = "student loans", 
+              "the ucla dean of students office" = "external fellowship",
+              "the ucla graduate opportunity fellowship paid for my first year
+              in graduate school" = "department fellowship/scholarship",
+              "the very small fellowship from the department" = 
+                "department fellowship/scholarship",
+              "took out graduate student loans" = "student loans", 
+              "ucla affiliates" = "department fellowship/scholarship",
+              "ucla grad division" = "external fellowship",
+              "worked as a graduate student researcher" = "gsr"
+              ))
+          
+```
+
+# recalculate count 
+```{r}
+funding_sep_count_clean2 <- funding_sep_count_clean %>%  
+  group_by(funding_MPP) %>%  
+  summarize (count = sum(count)) %>% 
+  arrange(count) %>%  
+  view()
+```
+
+# continue recoding values  
+```{r}
+funding_sep_count_clean2 <- funding_sep_count_clean2 %>%
+  mutate(funding_MPP = recode(funding_MPP,
+          "luskin fellowship/scholarship (david bohnett fellowship/liberty hill 
+          fellowship/michael s" = "luskin fellowship/scholarship (david bohnett 
+          fellowship/liberty hill fellowship/dukakis fellowship)",
+          "luskin fellowship/scholarship (david bohnett fellowship/liberty 
+          hill fellowship/michael s. dukakis fellowship)" = "luskin 
+          fellowship/scholarship (david bohnett fellowship/liberty hill 
+          fellowship/dukakis fellowship)",
+          "campus employment other that ta" = "on-campus employment", 
+          "gsr" = "on-campus employment", 
+          "a paid internship" = "off-campus employment", 
+          "army" = "off-campus employment",
+          "family supports" = "external sponsor (family/partner support)",
+          "luskin fellowships" = "luskin fellowship/scholarship (david bohnett 
+          fellowship/liberty hill fellowship/dukakis fellowship)",
+          "most funding was from loans" = "student loans", 
+          "on campus employment" = "on-campus employment", 
+          "raships" = "on-campus employment", 
+          "scholarship"= "department fellowship/scholarship",
+          "significant student loans! i also worked off" = "student loans", 
+          "employment" = "off-campus employment",
+          "private saving" = "private savings", 
+          "taships" = "on-campus employment"
+          ))
+```
+
+# recalculate count 
+```{r}
+funding_sep_count_clean3 <- funding_sep_count_clean2 %>%  
+  group_by(funding_MPP) %>%  
+  summarize (count = sum(count)) %>% 
+  arrange(count) %>% 
+  view()
+```
+
+# capitalize first letters of words  
+```{r}
+#check code  
+funding_sep_count_clean3 %>%  
+  mutate(funding_MPP = 
+           str_to_title(funding_MPP))
+
+clean_funding_sep_count_clean3 <- funding_sep_count_clean3 %>%  
+  mutate(funding_MPP = 
+           str_to_title(funding_MPP)) %>%  
+  arrange(count) %>%  
+  view()
+```
+
+# add percentage to count 
+```{r}
+clean_funding_sep_percent <- funding_sep_count_clean3 %>%  
+  mutate(percent = 
+           count/sum(count)) %>% 
+  arrange(desc(count)) %>%  
+  view()
+```
+
+*Data Visualization*
+
+#factor bars 
+```{r}
+clean_funding_sep_percent$funding_MPP <- 
+  factor(clean_funding_sep_percent$funding_MPP,
+         levels = c(
+           "External Fellowship",
+           "Family/Partner Support",
+           "Private Savings",
+           "Student Loans",
+           "Off-Campus Employment",
+           "On-Campus Employment",
+           "Department Fellowship/Scholarship"
+           ))
+```
+
+
+
+# create grouped bar chart for all years
+```{r}
+ggplot(clean_funding_sep_percent, 
+       aes(x = funding_MPP, 
+           y = count)) +
+                                      
+  geom_bar(
+    stat = 'identity',
+    fill = "lightblue",
+    position = 'dodge',
+    color = "black", 
+    na.rm = TRUE) +
+  
+  coord_flip() + 
+  
+  scale_y_continuous(
+    limits = c(0, 250),                
+    breaks = seq(0,250, 50)) +
+  
+  labs(
+    x = "", 
+    y = "Number of Mentions",
+    title = "Types of Funding MPP Students Receive\n (2019-2023)") +
+  
+  theme(
+    axis.text = element_text(hjust = .5, size =9), 
+    plot.caption = element_text(hjust = 1, ), 
+    plot.title = element_text(hjust = .5, face = "bold", size = 12)) +
+  
+  labs(
+    caption ="820 mentions from 265 students") 
+ 
+```
+
